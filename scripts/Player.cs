@@ -1,41 +1,83 @@
 using Godot;
 using System;
+using System.Security.Cryptography.X509Certificates;
 
 public partial class Player : CharacterBody2D
 {
-    
-	public const float Speed  = 300.0f;
-	public const float JumpVelocity  = -600.0f;
+	public const float Speed  = 300;
+	public const float JumpVelocity  = -600;
+	public const float Acceleration = 800;
+	private Vector2 velocity = Vector2.Zero;
+	
+	private AnimatedSprite2D _animatedSprite;
+	private AnimationPlayer _animationPlayer;
+	private AnimationTree _animationTree;
+	private AnimationNodeStateMachinePlayback _animationState;
+	private string _animationName;
 
-	public override void _PhysicsProcess(double delta)
+
+
+	public override void _Ready()
+	{
+		_animationPlayer = GetNode<AnimationPlayer>("AnimationPlayer");
+		_animatedSprite = GetNode<AnimatedSprite2D>("AnimatedSprite2D");
+		_animationTree = GetNode<AnimationTree>("AnimationTree");
+		_animationTree.Active = true;
+		_animationState = (AnimationNodeStateMachinePlayback)_animationTree.Get("parameters/playback");
+
+		
+	}
+	 public override void _PhysicsProcess(double delta)
 	{
 		Vector2 velocity = Velocity;
+		_animationName = "";
 
-		// Add the gravity.
+		bool isJumping = Velocity.Y < 0 && !IsOnFloor();
+        bool isFalling = Velocity.Y > 0 && !IsOnFloor();
+	
 		if (!IsOnFloor())
 		{
-			velocity += GetGravity() * (float)delta;
+			velocity += GetGravity() * (float)delta;	
 		}
 
-		// Handle Jump.
-		if (Input.IsActionJustPressed("ui_accept") && IsOnFloor())
+		if (Input.IsActionJustReleased("space") && velocity.Y < 0)
+		{
+				velocity.Y = JumpVelocity/43;
+		}
+		if (Input.IsActionJustPressed("space") && IsOnFloor())
 		{
 			velocity.Y = JumpVelocity;
 		}
 
-		// Get the input direction and handle the movement/deceleration.
-		// As good practice, you should replace UI actions with custom gameplay actions.
-		Vector2 direction = Input.GetVector("ui_left", "ui_right", "ui_up", "ui_down");
-		if (direction != Vector2.Zero)
+		float direction = Input.GetAxis("moveLeft", "moveRight");
+		if (direction != 0)
 		{
-			velocity.X = direction.X * Speed;
+			velocity.X = Mathf.MoveToward(Velocity.X, direction*Speed, Acceleration*(float)delta);
+			_animatedSprite.FlipH = velocity.X < 0; 	
+			if (IsOnFloor())
+			{
+				_animationState.Travel("walk");
+			}	
 		}
 		else
 		{
+			_animationState.Travel("idle");
 			velocity.X = Mathf.MoveToward(Velocity.X, 0, Speed);
+			if (IsOnFloor())
+            {
+               
+            }
+			else
+			{
+				_animationState.Travel("jumpFall");
+			}
 		}
+
+
+		
 
 		Velocity = velocity;
 		MoveAndSlide();
 	}
+
 }
